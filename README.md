@@ -1,6 +1,6 @@
 # Prompt Enhancer
 
-Transform basic prompts into professional-grade prompts using GPT-4.1.
+Transform basic prompts into professional-grade prompts using o3.
 
 Based on research from top prompt engineering projects:
 - [AI-Prompt-Enhancer](https://github.com/Pythonation/AI-Prompt-Enhancer) - DSE v7.0 cognitive architecture

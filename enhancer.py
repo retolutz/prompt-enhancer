@@ -13,6 +13,9 @@ from dotenv import load_dotenv
 
 from strategies import ALL_STRATEGIES, EnhancementStrategy, MASTER_ENHANCER
 
+# Models that don't support max_tokens and custom temperature
+REASONING_MODELS = {'o3', 'o3-mini', 'o1', 'o1-pro', 'o1-mini', 'gpt-5', 'gpt-5.4', 'gpt-5.2', 'gpt-5.1'}
+
 
 @dataclass
 class EnhancementResult:
@@ -25,7 +28,7 @@ class EnhancementResult:
 
 class PromptEnhancer:
     """
-    Core engine for enhancing prompts using OpenAI GPT-4.1.
+    Core engine for enhancing prompts using OpenAI o3.
 
     Based on research from:
     - DSE v7.0 (Deep Semantic Enhancer)
@@ -33,15 +36,15 @@ class PromptEnhancer:
     - MCP Prompt Optimizer (Research-backed strategies)
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4.1"):
+    def __init__(self, api_key: Optional[str] = None, model: str = "o3"):
         """
         Initialize the enhancer.
 
         Args:
             api_key: OpenAI API key. If not provided, reads from OPENAI_API_KEY env var.
-            model: Model to use for enhancement. Default: gpt-4.1 (best available)
+            model: Model to use for enhancement. Default: o3 (best available)
         """
-        load_dotenv(override=True)  # Override existing env vars with .env file
+        load_dotenv(override=True)
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError(
@@ -51,6 +54,27 @@ class PromptEnhancer:
 
         self.client = OpenAI(api_key=self.api_key)
         self.model = model
+
+    def _is_reasoning_model(self) -> bool:
+        """Check if current model is a reasoning model with limited parameters."""
+        return any(self.model.startswith(m) for m in REASONING_MODELS)
+
+    def _create_completion(self, messages: list, temperature: float = 0.7) -> dict:
+        """Create a chat completion with model-appropriate parameters."""
+        if self._is_reasoning_model():
+            # Reasoning models: no max_tokens, temperature must be 1
+            return self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+            )
+        else:
+            # Standard models: full parameter support
+            return self.client.chat.completions.create(
+                model=self.model,
+                max_tokens=2048,
+                temperature=temperature,
+                messages=messages,
+            )
 
     def enhance(
         self,
@@ -75,8 +99,8 @@ class PromptEnhancer:
                 - "output": Output specification
                 - "fewshot": Few-shot examples
                 - "refine": Self-refine integration
-            temperature: Creativity level (0.0-1.0).
-            max_tokens: Maximum tokens in response.
+            temperature: Creativity level (0.0-1.0). Ignored for reasoning models.
+            max_tokens: Maximum tokens in response. Ignored for reasoning models.
 
         Returns:
             EnhancementResult with original and enhanced prompts.
@@ -86,21 +110,12 @@ class PromptEnhancer:
 
         enhancement_strategy = ALL_STRATEGIES[strategy]
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            messages=[
-                {
-                    "role": "system",
-                    "content": enhancement_strategy.system_prompt
-                },
-                {
-                    "role": "user",
-                    "content": f"Enhance this prompt:\n\n{prompt}"
-                }
-            ]
-        )
+        messages = [
+            {"role": "system", "content": enhancement_strategy.system_prompt},
+            {"role": "user", "content": f"Enhance this prompt:\n\n{prompt}"}
+        ]
+
+        response = self._create_completion(messages, temperature)
 
         enhanced = response.choices[0].message.content.strip()
         tokens = response.usage.total_tokens
@@ -125,7 +140,7 @@ class PromptEnhancer:
             prompt: The original prompt to enhance.
             strategies: List of strategies to apply in order.
                        Default: ["role", "constraint", "cot", "output"]
-            temperature: Creativity level.
+            temperature: Creativity level. Ignored for reasoning models.
 
         Returns:
             EnhancementResult with fully enhanced prompt.
@@ -162,15 +177,10 @@ class PromptEnhancer:
         Analyze a prompt without enhancing it.
         Returns analysis of intent, entities, constraints, and issues.
         """
-        response = self.client.chat.completions.create(
-            model=self.model,
-            max_tokens=1024,
-            temperature=0.3,
-            response_format={"type": "json_object"},
-            messages=[
-                {
-                    "role": "system",
-                    "content": """Analyze the given prompt and return a JSON object with:
+        messages = [
+            {
+                "role": "system",
+                "content": """Analyze the given prompt and return a JSON object with:
 {
     "intent": "primary goal of the prompt",
     "entities": ["list", "of", "key", "entities"],
@@ -180,13 +190,11 @@ class PromptEnhancer:
     "quality_score": 1-10,
     "suggestions": ["improvement suggestions"]
 }"""
-                },
-                {
-                    "role": "user",
-                    "content": f"Analyze this prompt:\n\n{prompt}"
-                }
-            ]
-        )
+            },
+            {"role": "user", "content": f"Analyze this prompt:\n\n{prompt}"}
+        ]
+
+        response = self._create_completion(messages, temperature=0.3)
 
         try:
             return json.loads(response.choices[0].message.content)
@@ -198,15 +206,10 @@ class PromptEnhancer:
         Compare original and enhanced prompts.
         Returns analysis of improvements.
         """
-        response = self.client.chat.completions.create(
-            model=self.model,
-            max_tokens=1024,
-            temperature=0.3,
-            response_format={"type": "json_object"},
-            messages=[
-                {
-                    "role": "system",
-                    "content": """Compare the original and enhanced prompts. Return a JSON object:
+        messages = [
+            {
+                "role": "system",
+                "content": """Compare the original and enhanced prompts. Return a JSON object:
 {
     "improvements": ["list of specific improvements made"],
     "original_score": 1-10,
@@ -215,13 +218,11 @@ class PromptEnhancer:
     "specificity_delta": "+X or -X",
     "actionability_delta": "+X or -X"
 }"""
-                },
-                {
-                    "role": "user",
-                    "content": f"ORIGINAL:\n{original}\n\nENHANCED:\n{enhanced}"
-                }
-            ]
-        )
+            },
+            {"role": "user", "content": f"ORIGINAL:\n{original}\n\nENHANCED:\n{enhanced}"}
+        ]
+
+        response = self._create_completion(messages, temperature=0.3)
 
         try:
             return json.loads(response.choices[0].message.content)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Prompt Enhancer CLI
-Transform basic prompts into professional-grade prompts using GPT-4.1.
+Transform basic prompts into professional-grade prompts using o3.
 """
 
 import sys
@@ -25,7 +25,7 @@ def print_banner():
 [bold cyan]╔═══════════════════════════════════════════════════════════╗
 ║           🚀 PROMPT ENHANCER v1.0                         ║
 ║     Transform basic prompts into professional-grade       ║
-║          prompts using GPT-4.1                             ║
+║          prompts using o3                             ║
 ╚═══════════════════════════════════════════════════════════╝[/bold cyan]
 """
     console.print(banner)
@@ -63,7 +63,7 @@ def cli():
 @click.option("--interactive", "-i", is_flag=True, help="Interactive mode")
 def enhance(prompt, strategy, file, output, temperature, compare, interactive):
     """
-    Enhance a prompt using GPT-4.1.
+    Enhance a prompt using o3.
 
     Examples:
         prompt-enhancer enhance "Write a poem about nature"
