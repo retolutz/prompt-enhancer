@@ -173,6 +173,82 @@ for member in result.members:
     print(f"{member.name}: {member.response[:100]}...")
 ```
 
+## Council Agents
+
+### Project Council (Deep Context)
+
+The most powerful mode - analyzes your entire project and asks clarifying questions:
+
+```bash
+# Interactive mode - council asks questions to understand your task
+python project_council.py
+
+# With specific task
+python project_council.py --task "Add authentication"
+
+# Quick mode (skip questions)
+python project_council.py ask "How should I structure the API?" --quick
+
+# Just analyze project
+python project_council.py --analyze
+```
+
+**How it works:**
+1. Analyzes project structure, dependencies, framework
+2. Each LLM generates 5 clarifying questions
+3. Reads relevant code files based on your answers
+4. Council deliberates with full context
+5. Synthesizes project-aware recommendations
+
+### Council Agent (Standalone CLI)
+
+Direct council access for specific tasks:
+
+```bash
+# Code review
+python council_agent.py review path/to/file.py
+
+# Architecture decision
+python council_agent.py architect "Should I use microservices?"
+
+# Debug help
+python council_agent.py debug "App crashes on login" --code auth.py
+
+# Security audit
+python council_agent.py security api.py
+
+# General question
+python council_agent.py ask "Best caching strategy?"
+
+# Check status
+python council_agent.py status
+```
+
+### MCP Server (Claude Code Integration)
+
+Integrate the council directly into Claude Code:
+
+1. Create `.mcp.json` in your project:
+```json
+{
+  "mcpServers": {
+    "council": {
+      "command": "python",
+      "args": ["/path/to/mcp_council_server.py"],
+      "env": {
+        "OPENAI_API_KEY": "sk-...",
+        "ANTHROPIC_API_KEY": "sk-ant-...",
+        "GOOGLE_API_KEY": "AIza..."
+      }
+    }
+  }
+}
+```
+
+2. Restart Claude Code - now you can say:
+   - "Ask the council to review this code"
+   - "Get the council's opinion on this architecture"
+
 ## Based On
 
 Research from top prompt engineering projects:

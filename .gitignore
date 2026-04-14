@@ -1,5 +1,6 @@
 # Environment variables (API keys)
 .env
+.mcp.json
 
 # Python
 __pycache__/
