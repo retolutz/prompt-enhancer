@@ -5,7 +5,7 @@ Example usage of the Prompt Enhancer library.
 
 from enhancer import PromptEnhancer
 
-# Initialize (uses ANTHROPIC_API_KEY env var)
+# Initialize (uses OPENAI_API_KEY env var)
 enhancer = PromptEnhancer()
 
 # Example 1: Simple enhancement with master strategy
