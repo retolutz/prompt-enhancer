@@ -5,7 +5,7 @@ Uses multiple LLMs in parallel and aggregates the best result.
 Models used (best available):
 - OpenAI: o3 (best reasoning model)
 - Anthropic: Claude Opus 4 (best Claude model)
-- Google: Gemini 2.0 Flash (when quota available)
+- Google: Gemini 2.5 Pro (best Gemini model)
 """
 
 import os
@@ -99,9 +99,9 @@ class LLMCouncil:
 
         if self.google_client:
             self.members_config.append({
-                "name": "Gemini 2.0 Flash (Google)",
+                "name": "Gemini 2.5 Pro (Google)",
                 "provider": "google",
-                "model": "gemini-2.0-flash",  # Best Gemini model
+                "model": "gemini-2.5-pro",  # Best Gemini model
             })
 
     def _call_openai(self, prompt: str, system_prompt: str, model: str) -> tuple:

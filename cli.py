@@ -25,7 +25,7 @@ def print_banner(mode="single"):
 [bold magenta]╔═══════════════════════════════════════════════════════════╗
 ║           🏛️  LLM COUNCIL v1.0                             ║
 ║     Multi-model prompt enhancement with aggregation        ║
-║        o3 + Claude Opus 4 + Gemini 2.0                    ║
+║       o3 + Claude Opus 4 + Gemini 2.5 Pro                 ║
 ╚═══════════════════════════════════════════════════════════╝[/bold magenta]
 """
     else:
