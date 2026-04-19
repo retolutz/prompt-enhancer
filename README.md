@@ -170,6 +170,34 @@ Restart Claude Code. Then in any session:
 > "Get the council's opinion on GraphQL vs REST for our use case."
 > "Have the council research the current stable Stripe API version and any recent breaking changes."
 
+### Recommended: install the council skill
+
+A skill file ([`SKILL.md`](./SKILL.md)) is included in this repo. It teaches the calling Claude Code session:
+
+- **Pre-call context assembly** — a 6-source checklist (project briefing, business context, tech stack, prior decisions, constraints, already-ruled-out) that forces tight, relevant `context` strings of 150-500 tokens
+- **Chairman synthesis template** — a fixed 6-section structure for every council response to the user (Urteil / Wo einig / Wo uneins / Blinde Flecken / Empfehlung / Der eine erste Schritt)
+- **Fact-check requirement** — for `council_research_*` tools, a mandatory table verifying the three most important claims against sources
+- **HTML report template** — a complete standalone HTML+CSS template for exporting the synthesis as a shareable report
+
+Install it globally:
+
+```bash
+mkdir -p ~/.claude/skills/council
+cp SKILL.md ~/.claude/skills/council/SKILL.md
+```
+
+After restart, Claude Code auto-loads the skill whenever a user mentions the council ("ask the council", "second opinion", etc.) — no permanent context overhead.
+
+### Why the context-assembly step matters
+
+The council server is stateless. Each of the three models gets a clean session containing only:
+- A static system prompt (per tool type)
+- The `task` and `context` strings from the tool arguments
+
+Nothing else. No CLAUDE.md, no repo files, no conversation history, no memory. The skill's context-assembly checklist is what closes this gap — the calling session has project knowledge the models don't, and the skill makes sure that knowledge reaches the council instead of being implied.
+
+Without the skill, calls tend to be generic (`council_ask("what's the best approach?")`) and produce three generic answers. With the skill, calls carry concrete stack, constraints, prior decisions, and ruled-out options — and the three answers become specific enough to act on.
+
 ---
 
 ## Three modes
