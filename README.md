@@ -1,12 +1,14 @@
 # LLM Council
 
-Ask three top AI models in parallel, get one synthesized answer. Built for high-impact decisions where a single model can be wrong in expensive ways.
+Ask three top AI models in parallel, get three independent answers. Built for high-impact decisions where a single model can be wrong in expensive ways.
 
 ---
 
 ## What it does
 
-You send one question. Three models answer it independently. A fourth step merges the answers into a single recommendation that highlights agreements, disagreements, and trade-offs.
+You send one question. Three models answer it independently. You (or the calling session) synthesize the three answers into a single recommendation.
+
+No server-side aggregation — the raw responses come back to you. This keeps the architecture simple, the cost lower, and gives the caller full context when deciding how to weight each response.
 
 Works as:
 - A **CLI tool** for quick one-off consultations
@@ -19,7 +21,7 @@ Works as:
 
 - **Blind spots get smaller.** Different model families are wrong about different things.
 - **Disagreement is a signal.** When the council splits, you learn where the real trade-offs are.
-- **Synthesis beats voting.** The aggregator explains the why, not just the what.
+- **Synthesis beats voting.** You see the full reasoning of each model and decide.
 
 Not a silver bullet. Good for architecture choices, security reviews, hard bugs. Overkill for renaming a variable.
 
@@ -30,10 +32,10 @@ Not a silver bullet. Good for architecture choices, security reviews, hard bugs.
 | Provider | Model | Role |
 |----------|-------|------|
 | OpenAI | `gpt-5.4` | Deep reasoning, complex logic |
-| Anthropic | `claude-opus-4-7` | Synthesis, nuance, aggregation |
+| Anthropic | `claude-opus-4-7` | Nuance, synthesis |
 | Google | `gemini-3-pro-preview` | Breadth, creative solutions |
 
-Claude Opus 4.7 also acts as the aggregator that merges the three responses.
+All three can also be configured to use live web search (see _Research mode_ below).
 
 ---
 
@@ -105,19 +107,28 @@ python project_council.py ask "How should I structure the API layer?" --quick
 python project_council.py --analyze
 ```
 
-What happens under the hood:
-
-```
-1. Detect language, framework, project structure
-2. Ask up to 5 clarifying questions per model, deduplicated
-3. Read the files that matter for your question
-4. Send all three models the same context
-5. Aggregate into one recommendation
-```
-
 ### Option 3 — Claude Code integration (MCP)
 
-Make the council available as tools inside Claude Code. Once set up, any Claude Code session can call `council_ask`, `council_review`, `council_debug`, `council_architecture`, `council_security`, `council_refactor`.
+Make the council available as tools inside Claude Code. Once set up, any Claude Code session can call the council tools below.
+
+**Standard tools** (fast, no web search):
+
+| Tool | Use case |
+|------|----------|
+| `council_ask` | General questions, research, planning |
+| `council_review` | Code quality, bugs, best practices |
+| `council_architecture` | System design, tech stack choices |
+| `council_debug` | Root cause analysis for complex issues |
+| `council_security` | OWASP-style audits, auth patterns |
+| `council_refactor` | Modernization, reducing technical debt |
+
+**Research tools** (slower, web search enabled on all three models):
+
+| Tool | Use case |
+|------|----------|
+| `council_research_ask` | Questions that need current information (versions, prices, news) |
+| `council_research_architecture` | Tech decisions where the landscape shifts fast |
+| `council_research_security` | Audits that need current CVE / advisory data |
 
 **Global install (all projects):**
 
@@ -129,7 +140,7 @@ claude mcp add council python /path/to/llm-council/mcp_council_server.py \
   -e "GOOGLE_API_KEY=AIza..."
 ```
 
-**Per-project install** - drop this in your project root as `.mcp.json`:
+**Per-project install** — drop this in your project root as `.mcp.json`:
 
 ```json
 {
@@ -151,20 +162,20 @@ Restart Claude Code. Then in any session:
 
 > "Ask the council to review this authentication code."
 > "Get the council's opinion on GraphQL vs REST for our use case."
-> "Have the council help debug this connection timeout."
+> "Have the council research the current stable Stripe API version and any recent breaking changes."
 
 ---
 
-## Council types
+## Standard mode vs Research mode
 
-| Type | Use case |
-|------|----------|
-| `ask` | General questions, research, planning |
-| `review` | Code quality, bugs, best practices |
-| `architecture` | System design, tech stack choices |
-| `debug` | Root cause analysis for complex issues |
-| `security` | OWASP-style audits, auth patterns |
-| `refactor` | Modernization, reducing technical debt |
+| | Standard | Research |
+|---|---|---|
+| Web search | Off | On (all three models) |
+| Latency | ~5-20s | ~30-90s |
+| Cost per call | ~$0.20-0.90 | ~$0.60-2.50 |
+| Best for | Architecture, code review, debugging | Current versions, pricing, advisories, recent news |
+
+Standard mode uses the models' training knowledge — reliable for timeless concepts, unreliable for anything that changed recently. Research mode costs more and takes longer, but every answer is grounded in sources the model fetched at call time.
 
 ---
 
@@ -186,15 +197,14 @@ Restart Claude Code. Then in any session:
 
 ## Cost per consultation
 
-Three model calls plus one aggregation. Rough range:
+Three model calls in parallel. No server-side aggregation — the calling session synthesizes.
 
-| Step | Cost |
-|------|------|
-| GPT-5.4 | $0.10 - $0.60 |
-| Claude Opus 4.7 | $0.10 - $0.30 |
-| Gemini 3 Pro | $0.05 - $0.15 |
-| Aggregation (Opus 4.7) | $0.05 - $0.20 |
-| **Total** | **$0.30 - $1.25** |
+| Step | Standard | Research |
+|------|----------|----------|
+| GPT-5.4 | $0.05 - $0.30 | $0.15 - $0.80 |
+| Claude Opus 4.7 | $0.05 - $0.25 | $0.20 - $0.80 |
+| Gemini 3 Pro | $0.05 - $0.15 | $0.15 - $0.40 |
+| **Total** | **$0.15 - $0.70** | **$0.50 - $2.00** |
 
 Rule of thumb: if being wrong costs you less than 15 minutes of work, skip the council.
 
@@ -232,23 +242,22 @@ result = agent.consult(
     council_type="security",
     show_individual=True,
 )
-print(result["synthesis"])
+print(result["responses"])
 ```
 
+Low-level direct call:
+
 ```python
-from project_council import ProjectCouncil
+from mcp_council_server import init_clients, run_council
 
-council = ProjectCouncil("/path/to/project")
-council.analyze_project()
-
-questions = council.generate_clarifying_questions("Add authentication")
-# answer questions, then:
-result = council.consult_council(
-    task="Add JWT authentication",
-    answers={"method": "JWT with refresh tokens"},
-    relevant_code={"auth.py": "...code..."},
-    council_type="implement",
+init_clients()
+output = run_council(
+    task="Microservices vs modular monolith for a 4-person team?",
+    context="Current stack: Django + Postgres. Expected load: 10k req/day.",
+    council_type="architecture",
+    web_search=False,  # flip to True for research mode
 )
+print(output)
 ```
 
 ---
@@ -259,7 +268,7 @@ result = council.consult_council(
 llm-council/
 ├── council_agent.py         CLI for quick consultations
 ├── project_council.py       Project-aware interactive agent
-├── mcp_council_server.py    MCP server for Claude Code
+├── mcp_council_server.py    MCP server for Claude Code (with web-search variants)
 ├── council.py               Core multi-model library
 ├── enhancer.py              Single-model prompt enhancer
 ├── strategies.py            Prompt enhancement strategies
@@ -273,7 +282,15 @@ llm-council/
 
 ## Updating model versions
 
-Model IDs live in `mcp_council_server.py`. When a provider ships a new flagship model, update the four `model=` lines - three for the members, one for the aggregator. Keep the aggregator on whichever model is strongest at synthesis; Opus has been reliable for that role.
+Model IDs live at the top of `mcp_council_server.py`:
+
+```python
+MODEL_OPENAI = "gpt-5.4"
+MODEL_ANTHROPIC = "claude-opus-4-7"
+MODEL_GOOGLE = "gemini-3-pro-preview"
+```
+
+When a provider ships a new flagship model, update these three constants.
 
 ---
 
